@@ -19,8 +19,11 @@ POLICY = {
 }
 def guardToolCall(tool_name: str, args: dict) -> tuple[bool, str]:
     """Check if the tool call is allowed based on the policy."""
+
     action = POLICY.get(tool_name)
-    if action == "allow":
+    if tool_name in ("writeFiles", "deleteFiles") and args.get("fileName", "").strip(". ").lower().endswith(".py"):
+        return False, "Access to .py files is denied by policy."
+    elif action == "allow":
         return True, f"{tool_name} allowed"
     elif action == "approve":
         confirmation = input(f"Tool '{tool_name}' is requesting to be called with arguments {args}. Do you approve? (y/n): ")

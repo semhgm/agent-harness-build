@@ -17,12 +17,14 @@ POLICY = {
     "writeFiles": "approve",
     "deleteFiles": "approve",
 }
-def guardToolCall(tool_name: str, args: dict) -> tuple[bool, str]:
+def guardToolCall(tool_name: str, args: dict, tainted: bool) -> tuple[bool, str]:
     """Check if the tool call is allowed based on the policy."""
 
     action = POLICY.get(tool_name)
     if tool_name in ("writeFiles", "deleteFiles") and args.get("fileName", "").strip(". ").lower().endswith(".py"):
         return False, "Access to .py files is denied by policy."
+    elif tainted and tool_name in ("writeFiles", "deleteFiles"):
+        return False, "Session is tainted: untrusted file content was read. Write/delete actions are blocked. Tell the user."
     elif action == "allow":
         return True, f"{tool_name} allowed"
     elif action == "approve":
@@ -129,8 +131,9 @@ TOOL_SCHEMAS = [
 def chat(user_input: str) -> str:
     messages = [
         {"role": "system", "content": "You are a file assistant. Only use the provided tools. Never claim you did something unless a tool result confirms it. If no tool can do it, say so. /no_think"},
-        {"role": "user", "content": user_input}
+        {"role": "user", "content": user_input},
     ]
+    tainted = False
     turn = 0
     while True:
         turn += 1
@@ -151,7 +154,9 @@ def chat(user_input: str) -> str:
         for call in message.tool_calls:
             args = json.loads(call.function.arguments or "{}")
             print(f" [tool]{call.function.name}({args})")
-            allowed, reason = guardToolCall(call.function.name, args)   # 1. sonucu al
+            allowed, reason = guardToolCall(call.function.name, args,tainted)   # 1. sonucu al
+            if call.function.name == "readFiles" and allowed:  # Eğer readFiles çağrıldıysa ve izin verildiyse
+                tainted = True  # Tainted durumunu True yap
             if allowed:                                                  # 2. kontrol et
                 result = TOOLS[call.function.name](**args)
             else:

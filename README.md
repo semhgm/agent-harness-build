@@ -163,3 +163,5 @@ Ollama'nın `localhost:11434` üzerinde çalışıyor olması gerekiyor. Ajan sa
 - Ret mesajının biçiminin modelin dürüstlüğüne etkisi
 - Talimata uyma: istenen uzunluk ve dil, öz-bildirimin doğruluğu
 - Taint'in kullanılabilirlik bedeli: meşru akışların ne kadarının engellendiği
+
+Bu deneylerden çıkan kontrol soruları: [kazanimlar.md](kazanimlar.md)

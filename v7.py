@@ -1,3 +1,4 @@
+import hashlib
 import sys
 sys.stdout.reconfigure(encoding='utf-8') #for the emoji crash!
 import json
@@ -35,6 +36,21 @@ def audit(session, record: dict) -> None:
     with AUDIT_PATH.open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
+def summarizeText(text: str, limit: int = 200):
+    """Long text → preview + length + sha256. Short text stays as is."""
+    if len(text) <= limit:
+        return text
+    return {
+        "preview": text[:limit],
+        "length": len(text),
+        "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+    }
+
+def summarizeArgs(args: dict) -> dict:
+    out = dict(args)
+    if isinstance(out.get("content"), str):
+        out["content"] = summarizeText(out["content"])
+    return out
 def parseArgs(raw: str | None) -> tuple[dict | None, str | None]:
     """Parse tool arguments. Returns (args, error). Exactly one of them is None."""
     try:
@@ -189,7 +205,7 @@ def chat(session: Session, user_input: str) -> str:
         if not message.tool_calls:
             answer = message.content or "No response from the model."
             session.messages.append({"role": "assistant", "content": answer})
-            audit(session, {"event": "final_answer", "turn": turn, "answer": answer})
+            audit(session, {"event": "final_answer", "turn": turn, "answer": summarizeText(answer)})
             return answer
 
         session.messages.append(message)
@@ -231,7 +247,7 @@ def chat(session: Session, user_input: str) -> str:
                 "event": "tool_call",
                 "turn": turn,
                 "tool": name,
-                "args": args,
+                "args": summarizeArgs(args),
                 "allowed": allowed,
                 "rule": rule,
                 "tainted": tainted_before,

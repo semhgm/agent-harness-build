@@ -1,4 +1,4 @@
-from v7 import runTool
+from v7 import summarizeArgs
 
-#print(runTool("readFiles", {"filename": "a.txt"}))   # TypeError mesajı
-print(runTool("yokBoyleTool", {}))                   # not_implemented
+print(summarizeArgs({"fileName": "a.txt", "content": "kısa"}))
+print(summarizeArgs({"fileName": "b.txt", "content": "x" * 500}))

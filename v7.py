@@ -45,6 +45,19 @@ def parseArgs(raw: str | None) -> tuple[dict | None, str | None]:
         return None, 'Tool arguments must be a JSON object, e.g. {"fileName": "notes.txt"}.'
     return args, None
 
+def runTool(name: str, args: dict) -> tuple[str, str | None]:
+    """Run a tool safely. Returns (result_for_model, error_for_log)."""
+    func = TOOLS.get(name)
+    if func is None:
+        return f"Error: tool '{name}' is not implemented.", "not_implemented"
+    try:
+        return func(**args), None
+    except TypeError as e:
+        return (f"Error: wrong arguments for {name} ({e}). "
+                "Use the exact parameter names from the tool schema."), f"TypeError: {e}"
+    except Exception as e:
+        return f"Error: {name} failed ({type(e).__name__}).", f"{type(e).__name__}: {e}"
+
 def guardToolCall(tool_name: str, args: dict, tainted: bool) -> tuple[bool, str, str]:
     """Check if the tool call is allowed based on the policy."""
 
@@ -207,9 +220,12 @@ def chat(session: Session, user_input: str) -> str:
             if name == "readFiles" and allowed:
                 session.tainted = True
             if allowed:
-                result = TOOLS[name](**args)
+                result, error = runTool(name, args)
             else:
-                result = f"Blocked by policy: {reason}"
+                result, error = f"Blocked by policy: {reason}", None
+
+            if error:
+                print(f" [tool]{name} → error: {error}")
 
             audit(session, {
                 "event": "tool_call",
@@ -219,6 +235,7 @@ def chat(session: Session, user_input: str) -> str:
                 "allowed": allowed,
                 "rule": rule,
                 "tainted": tainted_before,
+                "error": error,
                 "result": result[:200],
             })
 

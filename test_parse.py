@@ -1,7 +1,4 @@
-from v7 import parseArgs
+from v7 import runTool
 
-print(parseArgs('{"fileName": "a.txt"}'))   # ({'fileName': 'a.txt'}, None)
-print(parseArgs('{"fileName": "a.txt"'))    # (None, 'Invalid JSON ...')
-print(parseArgs('[]'))                       # (None, 'Tool arguments must be ...')
-print(parseArgs(None))                      # ({}, None)
-print(parseArgs(''))   
+#print(runTool("readFiles", {"filename": "a.txt"}))   # TypeError mesajı
+print(runTool("yokBoyleTool", {}))                   # not_implemented

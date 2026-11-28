@@ -88,7 +88,7 @@ def guardToolCall(tool_name: str, args: dict, tainted: bool, approver) -> tuple[
     action = POLICY.get(tool_name)
     if tool_name in ("writeFiles", "deleteFiles") and args.get("fileName", "").strip(". ").lower().endswith(".py"):
         return False, "Access to .py files is denied by policy.", "py_rule"
-    elif tainted and tool_name in ("writeFiles", "deleteFiles"):
+    elif tainted and not isReadOnly(tool_name):
         return False, "Session is tainted: untrusted file content was read. Write/delete actions are blocked. Tell the user.", "taint"
     elif action == "allow":
         return True, f"{tool_name} allowed", "policy_allow"
@@ -134,7 +134,17 @@ TOOLS = {
     "writeFiles": writeFiles,
     "deleteFiles": deleteFiles,
 }
+TOOL_EFFECTS = {
+    "listFiles":   {"read_only": True},
+    "readFiles":   {"read_only": True},
+    "writeFiles":  {"read_only": False},
+    "deleteFiles": {"read_only": False},
+}
 
+
+def isReadOnly(tool_name: str) -> bool:
+    """Unknown tools are treated as NOT read-only (most dangerous)."""
+    return TOOL_EFFECTS.get(tool_name, {}).get("read_only", False)
 TOOL_SCHEMAS = [
     {
         "type": "function",

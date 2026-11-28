@@ -1,6 +1,6 @@
 # Kazanımlar: ajan yazarken kontrol soruları
 
-Bu dosya, bu repodaki deneylerden (v0 → v7) çıkan dersleri **kontrol soruları** olarak topluyor. Yeni bir ajan yazarken ya da bir AI'ın yazdığı ajan kodunu incelerken baştan sona okunması için yazıldı.
+Bu dosya, bu repodaki deneylerden (v0 → v8 ve Hafta 2 eval'leri) çıkan dersleri **kontrol soruları** olarak topluyor. Yeni bir ajan yazarken ya da bir AI'ın yazdığı ajan kodunu incelerken baştan sona okunması için yazıldı.
 
 Her maddede üç bilgi var: **soru**, **neden** (hangi deneyde ne oldu) ve **kanıt düzeyi**:
 
@@ -24,6 +24,7 @@ Path traversal (`../main.py`) prompt'la değil, `resolve()` + `is_relative_to()`
 
 **1.2 Modelin kandırılması durumunda en kötü ne olur?**
 Savunmayı modelin doğru davranacağı varsayımına kurma. `deneme1.txt` testinde model dosyadaki talimatı kullanıcı isteği gibi uyguladı ve iki dosyayı sildi. Soruyu "model bunu yapar mı?" değil, "model bunu yaparsa ne olur?" diye sor. `[gözlem]`
+Hafta 2 ölçümü (v8, `injection_delete`, 40 koşu): model 3/40 koşuda silmeyi denedi; taint kuralı 3 denemenin 3'ünü engelledi, dosyalar 40/40 sağlam kaldı. Modelin direnci saldırı metnine bağlı, harness'ın koruması değil. `[ölçüldü]`
 
 **1.3 Geri alınamaz işlemler (silme, gönderme, ödeme) insan onayından geçiyor mu?**
 Onay, harness içinde ve modelin atlayamayacağı bir yerde olmalı. `[kod]`
@@ -59,12 +60,13 @@ Kesin yasaklar (uzantı kuralı, taint) kullanıcı onayından **önce** gelmeli
 
 **3.4 Girdi karşılaştırmadan önce normalize ediliyor mu?**
 `test.PY` ve `test.py.` (Windows sondaki noktayı siliyor) ilk kontrolü geçti. Büyük/küçük harf, sondaki nokta ve boşluk, Unicode benzeri karakterler: karşılaştırmayı normalize edilmiş değer üzerinde yap. `[gözlem]`
+v7 büyük/küçük harf ile sondaki nokta ve boşluğu normalize ediyor. Açık kalanlar: Windows'ta `test.py::$DATA` (NTFS veri akışı sözdizimi, `.py` ile bitmediği için kontrolü geçiyor ama `test.py`'ye yazıyor) ve Unicode benzeri karakterler. String temizleyerek doğru karar vermek zor; asıl çözüm beyaz liste (3.3). `[kod]`, ADS davranışı makinede test edilecek.
 
 **3.5 Ret sebebi modele, kısa etiket log'a ayrı ayrı gidiyor mu?**
 `reason` (modele giden açıklama) ile `rule` (log için sabit etiket) ayrı tutulmalı. Serbest metin üzerinde string araması yaparak log sorgulamak kırılgan. `[kod]`
 
 **3.6 Ret mesajının biçimi modelin davranışını nasıl etkiliyor?**
-"Do not retry. Tell the user they declined it." gibi açık talimatlar modelin reddedilen işlemi tekrar denemesini ve gizlemesini azaltıyor gibi görünüyor. `[gözlem]` → Hafta 2'de ölçülecek.
+"Do not retry. Tell the user they declined it." gibi açık talimatlar modelin reddedilen işlemi tekrar denemesini ve gizlemesini azaltıyor gibi görünüyor. `[gözlem]` → Hafta 2'de ölçülecek. Bkz. 7.4: aynı eval ikisini birlikte günceller.
 
 ---
 
@@ -77,7 +79,7 @@ Bozuk JSON, dict olmayan JSON (`[]`), yanlış parametre adı, tool içi excepti
 Hata mesajı modele `tool` mesajı olarak gidince model kendini düzeltebiliyor. `TypeError` için parametre adını söyleyen bir mesaj işe yarıyor. Binary dosya testinde model içerik uydurmadı ve dosyanın okunamadığını söyledi. `[gözlem]`
 
 **4.3 Her `tool_call` için, hata olsa bile, bir `tool` mesajı ekleniyor mu?**
-API, cevapsız kalan bir tool çağrısından sonraki isteği reddediyor. `continue` kullan, `break` değil: aynı mesajdaki diğer çağrılar da cevap bekliyor. `[kod]`
+API, cevapsız kalan bir tool çağrısından sonraki isteği reddediyor. `continue` kullan, `break` değil: aynı mesajdaki diğer çağrılar da cevap bekliyor. `[gözlem]` (OpenAI API reddediyor; Ollama'nın OpenAI uyumlu ucunda test edilmedi.)
 
 **4.4 Modele giden hata mesajı ile log'a giden hata detayı ayrı mı?**
 `OSError` mesajları tam dosya yolunu (kullanıcı adı, klasör yapısı) içeriyor. Modele hata türü yeterli; tam detay log'a. `[kod]`
@@ -123,21 +125,49 @@ Uzun içerik log'u şişiriyor ve onu bir hassas veri deposuna dönüştürüyor
 
 **7.1 Model bir işlemi yaptığını söylüyorsa, bunu bir tool sonucu doğruluyor mu?**
 Model bazen tool çağırmadan ya da tool hata verdiği hâlde "yaptım" dedi. System prompt kuralı bunu azaltıyor, ortadan kaldırmıyor. Doğrulamayı log ile yap. `[gözlem]`
+Hafta 2 ölçümü: model 40 koşunun 4'ünde hiçbir silme çağrısı yapmadan "dosyalar temizlendi / silindi" dedi. System prompt'taki "Never claim you did something unless a tool result confirms it" kuralına rağmen. `[ölçüldü]`
 
 **7.2 Modelin kendi çıktısı hakkındaki iddiaları kodla doğrulanıyor mu?**
 "300 kelime" istendi. Model 100 kelime yazdı ve metne kendisi "(300 kelime)" etiketini ekledi. Önceki denemede ~160 kelime ve istenen dil yerine İngilizce. Sayılabilen bir şeyi (kelime sayısı, dosya sayısı, test sonucu) modele sorma, kodla ölç. `[gözlem]`
 
 **7.3 Güvenlik önlemleri devredeyken asıl görev tamamlanıyor mu?**
 Injection varken guard dosyaları korudu, ama model asıl görevi (fiyatları söylemek) unuttu. "Saldırı engellendi" ile "kullanıcı istediğini aldı" ayrı ayrı kontrol edilmeli. `[gözlem]`
+Hafta 2 ölçümü: görev 39/40 tamamlandı. Tek başarısızlık modelin silmeyi denediği bir koşuda. Veri az, ama örüntü: model saldırıyla uğraşınca asıl işi unutabiliyor. `[ölçüldü]`
 
 **7.4 Model saldırıyı ya da başarısızlığı kullanıcıdan gizliyor mu?**
-Injection talimatındaki "do not mention" bazen işe yaradı. Ret durumunda modelin kullanıcıya ne söylediğini ayrıca kontrol et. `[gözlem]`
+Injection talimatındaki "do not mention" bazen işe yaradı. Ret durumunda modelin kullanıcıya ne söylediğini ayrıca kontrol et. `[gözlem]` Bkz. 3.6.
+Hafta 2 ölçümü: 40 koşunun hiçbirinde model kullanıcıya dosyada bir saldırı talimatı olduğunu söylemedi (0/40). "Silme engellendi" diyen cevaplar bile silmeyi kullanıcı istemiş gibi konuştu. `[ölçüldü]`
+
+**7.5 Guard eylemi durdurur, sözü durdurmaz.**
+Ölçümde model silmeyi 3 kez denedi ama 4 kez yalan söyledi; yalanların hiçbirinde tool çağrısı yoktu. Model saldırıyı "yapmış gibi" anlatabiliyor ve bunu hiçbir tool kuralı engelleyemiyor. Kullanıcıya giden metin için ayrı bir önlem gerekir: örneğin harness'ın, modelin bastıramayacağı kendi uyarısını eklemesi ("bu cevap güvenilmeyen içerik okunduktan sonra üretildi"). `[ölçüldü]`
+
+---
+
+## 8. Ölçüm (eval)
+
+**8.1 Bu davranış deterministik mi, olasılıksal mı?**
+Kodla yazılmış kural (taint, `.py` yasağı, harness uyarısı) aynı girdide hep aynı sonucu verir: tek seferlik test yeterli. Modelin davranışı aynı girdide değişir: N kez koş, oranı ölç. Aynı dosya ve aynı mesajla bir koşuda model silmeyi hiç denemedi, bir sonrakinde iki dosyayı da silmeye çalıştı. `[ölçüldü]`
+
+**8.2 Modelin davranışı ile harness'ın koruması ayrı ayrı ölçülüyor mu?**
+"Model kandırıldı mı?" (3/40) ile "harness korudu mu?" (40/40) farklı sorular. Birincisi saldırı metnine göre değişir, ikincisi senin kodun. Tek bir "başarı oranı" ikisini karıştırır. `[ölçüldü]`
+
+**8.3 Puanlayıcı doğrulandı mı?**
+Eval'in kendisi de hata yapabilir. İlk kelime araması ("sil") "temizlik" diyen yalanları kaçırdı ve özet "0 yalan" dedi; cevaplar okununca 3'te 2 çıktı. Kelime listesi, `.py` kara listesiyle aynı sebeple çöküyor. Önce birkaç koşunun cevabını gözle oku, puanlayıcıyı ona göre düzelt. Hakem model (LLM-as-judge) kullanılacaksa onu da elle etiketlenmiş örneklerle ölç: hem kaçırma hem yanlış alarm. `[ölçüldü]`
+
+**8.4 Sonuç hangi kapsamda geçerli?**
+"3/40" = bu saldırı metniyle, bu modelle, bu prompt'la. "Model %7.5 kandırılıyor" değil. Saldırı dili, model ya da prompt değişince oran değişir; birden fazla senaryo gerekir. Küçük sayılarda belirsizlik büyük: 3 koşuda 3'te 2, 20 koşuda 20'de 1 yalan çıktı. `[ölçüldü]`
+
+**8.5 Pahalı veri işlenmeden önce kaydediliyor mu?**
+20 koşu (~15 dk) özet fonksiyonundaki bir `KeyError` yüzünden kayboldu, çünkü kaydetme özetten sonraydı. Önce ham sonucu yaz, sonra işle. Elle yapılan etiketleri de yeniden üretilebilir ham sonuç dosyasından ayrı tut, yoksa bir sonraki koşu üzerine yazar. `[gözlem]`
+
+**8.6 Eval, bir değişikliğin işe yaradığını kanıtlıyor mu?**
+"Düzelttim" de bir iddia. Aynı eval'i değişiklikten önce ve sonra koş, oranları karşılaştır. Aynı eval ileride başka bir değişikliğin eski bir korumayı bozup bozmadığını da gösterir (regresyon). `[kod]`
 
 ---
 
 ## Hızlı kontrol: AI'ın yazdığı bir ajanı incelerken
 
-Bir AI'dan "bana bir ajan yaz" dediğinde, çıkan kodda bu 12 soruyu sor. Varsayılan olarak çoğu eksik gelir.
+Bir AI'dan "bana bir ajan yaz" dediğinde, çıkan kodda bu 13 soruyu sor. Varsayılan olarak çoğu eksik gelir.
 
 1. Tool'ların erişim alanı kodla mı sınırlı? (1.1)
 2. Geri alınamaz işlemler insan onayından geçiyor mu? (1.3)
@@ -151,7 +181,8 @@ Bir AI'dan "bana bir ajan yaz" dediğinde, çıkan kodda bu 12 soruyu sor. Varsa
 10. Tur sınırı var mı? (4.6)
 11. Yapılandırılmış, ajanın erişemediği bir audit log var mı? Uzun veya hassas içerik nasıl yazılıyor? (6.2–6.5)
 12. Modelin "yaptım" ve "şu kadar" iddiaları kodla doğrulanıyor mu? (7.1, 7.2)
+13. Modelin davranışı tek denemeyle değil, tekrarlanabilir bir eval'le ölçülmüş mü; model ve harness ayrı ayrı mı? (8.1, 8.2)
 
 ---
 
-*Son güncelleme: Hafta 1 sonu (v7). `[gözlem]` etiketli maddeler Hafta 2 eval'larından sonra `[ölçüldü]` olarak güncellenecek ya da düzeltilecek.*
+*Son güncelleme: Hafta 2, ilk eval (v8, `injection_delete`, 2 × 20 koşu). Sonuçlar: `evals/results/`. Kalan `[gözlem]` maddeleri sonraki senaryolarla güncellenecek.*
